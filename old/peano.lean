@@ -1,6 +1,10 @@
-import .fol tactic.tidy tactic.linarith .realization
+/-
+Copyright (c) 2019 The Flypitch Project. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
 
-open fol
+Authors: Jesse Han, Floris van Doorn
+-/
+import .realization
 
 -- local attribute [instance, priority 0] classical.prop_decidable
 --local attribute [instance] classical.prop_decidable
@@ -10,78 +14,6 @@ local notation `[]` := dvector.nil
 local notation `[` l:(foldr `, ` (h t, dvector.cons h t) dvector.nil `]`) := l
 
 namespace peano
-section
-
-/-- Given a nat k and a 0-formula ψ, return ψ with ∀' applied k times to it --/ 
-@[simp] def alls {L : Language}  :  Π n : ℕ, formula L → formula L
---:= nat.iterate all n
-| 0 f := f
-| (n+1) f := ∀' alls n f
-
-@[simp]def bd_alls' {L : Language} : Π k n : ℕ, bounded_formula L (n + k) → bounded_formula L n
-| 0 n         f := f
-| (k+1) n     f := bd_alls' k n (∀' f)
-
-
-@[simp]def bf_k_plus_zero {L} {k} : bounded_formula L (0 + k) = bounded_formula L k :=
-by {convert rfl, rw[zero_add]}
-
-
-@[simp] def bd_alls {L : Language}  : Π n : ℕ, bounded_formula L n → sentence L
-| 0     f := f
-| (n+1) f := bd_alls n (∀' f) -- bd_alls' (n+1) 0 (f.cast_eqr (zero_add (n+1)))
-
-/-- generalization of bd_alls where we can apply less than n ∀'s--/
-
-
-def bf_n_of_0_n {L : Language} {n} (ψ : bounded_formula L (0 + n)) : bounded_formula L n :=
-by {convert ψ, rw[zero_add]}
-
-def bf_0_n_of_n {L : Language} {n} (ψ : bounded_formula L n) : bounded_formula L (0 + n) :=
-by {convert ψ, apply zero_add}
-
--- set_option pp.all true
--- set_option pp.notation false
-
-@[simp]lemma mpr_lemma {α β: Type*} {p q : α = β} {x : β} : eq.mpr p x = eq.mpr q x := by refl
-
-@[simp]lemma mpr_lemma2 {L} {n m : ℕ} {h : m = n} {h' : bounded_formula L m = bounded_formula L n} {h'' : bounded_formula L (m+1) = bounded_formula L (n+1)} {f : bounded_formula L (n+1)} : ∀' eq.mpr h'' f = eq.mpr h' (∀'f) :=
- by {ext1, induction h, refl}
-
--- lemma obvious3 {L : Language} {n} {ψ : bounded_formula L (n+1)} (p q :  bounded_formula L (n - n) = bounded_formula L (n - n)) : eq.mpr p (bd_alls' n n (∀' ψ)) = eq.mpr q (bd_alls' n n (∀' ψ)) :=
--- by apply mpr_lemma -- refl also suffices here
-
--- lemma obvious4 {L : Language} {n} {ψ : bounded_formula L (n+1)} (p : bounded_formula L (n - n) = bounded_formula L (n - n)) :
--- (bd_alls' n n (∀' ψ)) = eq.mpr p (bd_alls' n n (∀' ψ)) :=
--- begin
---   have : bd_alls' n n (∀' ψ) = eq.mpr rfl (bd_alls' n n (∀' ψ)), by refl,
---   have := obvious3 rfl p, swap, exact ψ, cc
--- end
-/- Obviously, bd_alls' n 0 ψ = bd_alls ψ -/
--- bd_alls n ψ = bd_alls' n 0 (by {convert ψ, apply zero_add})
-
---protected def cast_eqr {n m l} (h : n = m) (f : bounded_preformula L m l) : bounded_preformula L n l :=
---f.cast $ ge_of_eq h
-
-
-@[simp] lemma alls'_alls {L : Language} : Π n (ψ : bounded_formula L n), bd_alls n ψ = bd_alls' n 0 (ψ.cast_eq (zero_add n).symm) :=
-  by {intros n ψ, induction n, swap, simp[n_ih (∀' ψ)], tidy}
-
--- @[simp] lemma alls'_alls {L : Language} : Π n (ψ : bounded_formula L n), bd_alls n ψ = bd_alls' n 0 (by {convert ψ, apply zero_add}) :=
--- begin
---   intros n ψ, induction n with n ih generalizing ψ, refl, simp[ih (∀' ψ)]
--- end
-
-@[simp]lemma alls'_all_commute {L : Language} {n} {k} {f : bounded_formula L (n+k+1)} : (bd_alls' k n (∀' f)) = ∀' bd_alls' k (n+1) (f.cast_eq (by simp))-- by {refine ∀' bd_alls' k (n+1) _, simp, exact f}
-:=
-  by {induction k; dsimp only [bounded_preformula.cast_eq], swap, simp[@k_ih (∀'f)], tidy}
-
--- @[simp]lemma alls'_all_commute {L : Language} {n} {k} {f : bounded_formula L (n + k + 1)} : bd_alls' k n (∀' f) = ∀' bd_alls' k (n+1) (by {simp, exact f}) :=
--- begin
---   induction k, refl, unfold bd_alls', rw[@k_ih (∀' f),<-mpr_lemma2],
---   simp only [add_comm, eq_self_iff_true, add_right_inj, add_left_comm]
--- end 
-
 
 
 -- @[simp]lemma bd_alls'_substmax {L} {n} {f : bounded_formula L (n+1)} {t : closed_term L} : (bd_alls' n 1 (f.cast_eq (by simp)))[t /0] = (bd_alls' n 0 (substmax_bounded_formula (f.cast_eq (by simp)) t)) := by {induction n, {tidy}, have := @n_ih (∀' f), simp[bounded_preformula.cast_eq] at *, exact this}
@@ -115,7 +47,7 @@ end
 -- begin
 --   induction k with k ih,
 --   intros f hf, exact hf,
---   intros f hf, 
+--   intros f hf,
 --   have H := alls_succ_k,
 
 --   have hf_rw : formula_below (n + nat.succ k) f → formula_below (n+k) ∀'f, by {apply b_alls_1},
@@ -156,15 +88,15 @@ inductive peano_functions : ℕ → Type -- thanks Floris!
 
 def L_peano : Language := ⟨peano_functions, λ n, empty⟩
 
-def L_peano_plus {n} (t₁ t₂ : bounded_term L_peano n) : bounded_term L_peano n := 
+def L_peano_plus {n} (t₁ t₂ : bounded_term L_peano n) : bounded_term L_peano n :=
 @bounded_term_of_function L_peano 2 n peano_functions.plus t₁ t₂
-def L_peano_mult {n} (t₁ t₂ : bounded_term L_peano n) : bounded_term L_peano n := 
+def L_peano_mult {n} (t₁ t₂ : bounded_term L_peano n) : bounded_term L_peano n :=
 @bounded_term_of_function L_peano 2 n peano_functions.mult t₁ t₂
 
 local infix ` +' `:100 := L_peano_plus
 local infix ` ×' `:150 := L_peano_mult
 
-def succ {n} : bounded_term L_peano n → bounded_term L_peano n := 
+def succ {n} : bounded_term L_peano n → bounded_term L_peano n :=
 @bounded_term_of_function L_peano 1 n peano_functions.succ
 def zero {n} : bounded_term L_peano n := bd_const peano_functions.zero
 def one {n} : bounded_term L_peano n := succ zero
@@ -197,7 +129,7 @@ def p_succ_plus : sentence L_peano := ∀' ∀'(&1 +' succ &0 ≃ succ (&1 +' &0
 /- ∀ x, x ⬝ 0 = 0 -/
 def p_zero_of_times_zero : sentence L_peano := ∀'(&0 ×' zero ≃ zero)
 
-@[reducible]def shallow_zero_of_times_zero : Prop := ∀ x : ℕ, x * 0 = 0 
+@[reducible]def shallow_zero_of_times_zero : Prop := ∀ x : ℕ, x * 0 = 0
 
 /- ∀ x y, (x ⬝ succ y = (x ⬝ y) + x -/
 def p_times_succ  : sentence L_peano := ∀' ∀' (&1 ×' succ &0 ≃ &1 ×' &0 +' &1)
@@ -274,12 +206,12 @@ lemma shallow_induction (P : set nat) : (P(0) ∧ ∀ x, P x → P (nat.succ x))
   λ h, nat.rec h.1 h.2
 
 section notation_test
-#reduce (ℕ')[(@zero 0) /// [] ]
+-- #reduce (ℕ')[(@zero 0) /// [] ]
 
 
-#reduce (L_peano_structure_of_nat)[(p_zero_not_succ)]
+-- #reduce (L_peano_structure_of_nat)[(p_zero_not_succ)]
 
-#reduce (L_peano_structure_of_nat)[(&0 ≃ zero : bounded_formula L_peano 1) ;; ([(1 : ℕ)] : dvector (ℕ') 1)] 
+-- #reduce (L_peano_structure_of_nat)[(&0 ≃ zero : bounded_formula L_peano 1) ;; ([(1 : ℕ)] : dvector (ℕ') 1)]
 
 -- #reduce (&0 : bounded_term L_peano 1)[zero // 0] -- elaborator fails, don't know why
 -- need to fix subst_bounded_term notation, something's not type-checking
@@ -295,7 +227,7 @@ end notation_test
 -- end
 
 -- @[simp]lemma subst_term'_cancel {n} {k} : Π ψ : bounded_formula L_peano (k + 1), (ψ ↑' 1 # 1)[succ &0 /0][formal_nat n /0] = ψ[formal_nat (nat.succ n) /0] := by simp
-  
+
 -- begin
 
 --   -- intros n ψ, unfold subst0_bounded_formula, tidy, -- simp[lift_subst_formula_cancel ψ.fst 0],
@@ -307,7 +239,7 @@ end notation_test
 -- def val_of_dvector {α : Type*} [has_zero α] {n} (xs : dvector α n): ℕ' → α :=
 -- begin
 --   intro k,
---   by_cases nat.lt k n, 
+--   by_cases nat.lt k n,
 --     exact xs.nth k h,
 --     exact 0
 -- end
@@ -339,7 +271,8 @@ end notation_test
 
 
 /- ℕ' satisfies PA induction schema -/
-theorem PA_standard_model_induction {index : nat} {ψ : bounded_formula L_peano (index + 1)} : ℕ' ⊨ bd_alls index (ψ[zero /0] ⊓ ∀'(ψ ⟹ (ψ ↑' 1 # 1)[succ &0 /0]) ⟹ ∀' ψ) :=
+theorem PA_standard_model_induction {index : nat} {ψ : bounded_formula L_peano (index + 1)} :
+  ℕ' ⊨ bd_alls index (ψ[zero /0] ⊓ ∀'(ψ ⟹ (ψ ↑' 1 # 1)[succ &0 /0]) ⟹ ∀' ψ) :=
 begin
   rw[realize_sentence_bd_alls], intro xs,
   simp,
@@ -358,7 +291,7 @@ begin
   intros f hf, cases hf with not_induct induct,
   swap,
   {rcases induct with ⟨induction_schemas, ⟨⟨index, h_eq⟩, ih_right⟩⟩,
-  rw[h_eq] at ih_right, simp[set.range, set.image] at ih_right,
+  rw [←h_eq] at ih_right, simp[set.range, set.image] at ih_right,
   rcases ih_right with ⟨ψ, h_ψ⟩, subst h_ψ, apply PA_standard_model_induction},
   {repeat{cases not_induct}, tidy, contradiction}
 end
@@ -372,6 +305,6 @@ end
 
 def PA_standard_model : Model PA := ⟨ℕ', true_arithmetic_extends_PA⟩
 
-end
+end PA
 end peano
 

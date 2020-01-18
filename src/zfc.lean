@@ -1,274 +1,545 @@
-import .fol set_theory.zfc tactic.tidy
+/-
+Copyright (c) 2019 The Flypitch Project. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+
+Authors: Jesse Han, Floris van Doorn
+-/
+import .bfol .forcing .forcing_CH
+
+open lattice
+
+open bSet
 
 open fol
-
-namespace zfc
-
-inductive ZFC_rel : ℕ → Type 1
-| ϵ : ZFC_rel 2
-
-def L_ZFC : Language.{1} := 
-⟨λ_, ulift empty, ZFC_rel⟩
-
-/- Note from Mario: should try using L_ZFC' -/
-
-def ZFC_el : L_ZFC.relations 2 := ZFC_rel.ϵ
-
-local infix ` ∈' `:100 := bounded_formula_of_relation ZFC_el
-
----ugly but working (str_formula says it's not well-founded recursion, but it evaluates anyways)
---def str_preterm : ∀ n m : ℕ, ℕ → bounded_preterm L_ZFC n m → string
---  | n m z &k := "x" ++ to_string(z - k)
---  | _ _ _ _ := "h"
---def str_term: ∀ n : ℕ, ℕ → bounded_term L_ZFC n → string
---  | n m &k := "x" ++ to_string(m - k.val)
---  | _ _ _ := "n"
---def str_preformula : ∀ n m : ℕ, ℕ → bounded_preformula L_ZFC n m → string
---  | _ _ _ (bd_falsum ) := "⊥"
---  | n m z (bd_equal a b) := str_preterm n m z a ++ " = " ++ str_preterm n m z b
---  | n m z (a ⟹ b) := str_preformula n m z a ++ " ⟹ " ++ str_preformula n m z b
---  | n m z (bd_rel _) := "∈"
---  | n m z (bd_apprel a b) := str_preformula n (m+1) z a ++ "(" ++ str_term n z b ++ ")"
---  | n m z (∀' t) := "(∀x" ++ to_string(z+1) ++ "," ++ str_preformula (n+1) m (z+1) t ++ ")"
---def str_formula : ∀ {n : ℕ}, bounded_formula L_ZFC n → ℕ → string
---  | n ((f₁ ⟹ (f₂ ⟹ bd_falsum)) ⟹ bd_falsum) m:= "(" ++ str_formula f₁ m ++ "∧" ++ str_formula f₂ m ++ ")"
---  | n ((f₁ ⟹ bd_falsum) ⟹ f₂) m := "(" ++ str_formula f₁ m ++ " ∨ " ++ str_formula f₂ m ++ ")"
---  | n (bd_equal s1 s2) m := "(" ++ str_term n m s1 ++ " = " ++ str_term n m s2 ++ ")"
---  | n (∀' f) m := "(∀x"++ to_string(m + 1) ++ "," ++ (str_formula f (m+1) ) ++ ")"
---  | _ bd_falsum _ := "⊥"
--- | n (f ⟹ bd_falsum) m := "~" ++ str_formula f m
---  | n (bd_apprel (f₁) f₂) m := str_preformula n 1 m f₁ ++ "(" ++ str_term n m f₂ ++ ")"
---  | n (bd_imp a b) m := "(" ++ str_formula a m ++ " ⟹ " ++ str_formula b m ++ ")"
---
---def print_formula : ∀ {n : ℕ}, bounded_formula L_ZFC n → string := λ n f, str_formula f n
-
-local notation `lift_cast` := by {repeat{apply nat.succ_le_succ}, apply nat.zero_le}
-
--- local notation `to_dfin` := tactic.interactive.to_dfin
-
--- section test
-
--- /- ∀ x, ∀ y, x = y → ∀ z, z = x → z = y -/
--- def testsentence : sentence L_ZFC := ∀' ∀' (&1 ≃ &0 ⟹ ∀' (&0 ≃ &2 ⟹ &0 ≃ &1))
--- end test
-
-----------------------------------------------------------------------------
-
-def Class : Type 1 := bounded_formula L_ZFC 1
-def small {n} (c : bounded_formula L_ZFC (n+1)) : bounded_formula L_ZFC n := 
-∃' ∀' (&0 ∈' &1 ⇔ (c ↑' 1 # 1))
-
-def subclass (c₁ c₂ : Class) : sentence L_ZFC := ∀' (c₁ ⟹ c₂)
-def functional {n} (c : bounded_formula L_ZFC (n+2)) : bounded_formula L_ZFC n := 
--- ∀x ∃y ∀z, c z x ↔ z = y
-∀' ∃' ∀' (c ↑' 1 # 1 ⇔ &0 ≃ &1)
-def subset : bounded_formula L_ZFC 2 := ∀' (&0 ∈' &1 ⟹ &0 ∈' &2)
-def is_emptyset : bounded_formula L_ZFC 1 := ∼ ∃' (&0 ∈' &1) 
-def pair : bounded_formula L_ZFC 3 := (&0 ≃ &1 : bounded_formula L_ZFC 3) ⊔ (&0 ≃ &2 : bounded_formula L_ZFC 3)
-def singl : bounded_formula L_ZFC 2 := &0 ≃ &1
-def binary_union : bounded_formula L_ZFC 3 := &0 ∈' &1 ⊔ &0 ∈' &2
-def succ : bounded_formula L_ZFC 2 := (&0 ≃ &1 : bounded_formula L_ZFC 2) ⊔ &0 ∈' &1 
-
-def ordered_pair : bounded_formula L_ZFC 3 := ∀'(&0 ∈' &1 ⇔ (&0 ≃ &3 : bounded_formula L_ZFC 4) ⊔ ∀'(&0 ∈' &1 ⇔ pair ↑' 1 # 1 ↑' 1 # 1))
-
--- &0 is an ordered pair of &2 and &1 (z = ⟨x, y⟩)
-
-def ordered_pair' : bounded_formula L_ZFC 3 := ∀'(&0 ∈' &3 ⇔ (&0 ≃ &2 : bounded_formula L_ZFC 4) ⊔ ∀'(&0 ∈' &1 ⇔ (pair ↑' 1 # 1).cast(lift_cast)))
--- &2 is an ordered pair of &1 and &0 (x = ⟨y,z⟩)
--- TODO: Make defns like this unnecessary (current effort is subst_var_* in fol.lean)
-
-def is_ordered_pair : bounded_formula L_ZFC 1 := ∃' ∃' ordered_pair
---&0 is an ordered pair of some two elements--
-
 local notation h :: t  := dvector.cons h t
-local notation `[` l:(foldr `, ` (h t, dvector.cons h t) dvector.nil `]`) := l
+local notation `[` l:(foldr `, ` (h t, dvector.cons h t) dvector.nil `]`:0) := l
+
+local infixr ` ⟹' `:65 := lattice.imp
+local prefix `∃'` := bd_ex
+local prefix `∼` := bd_not
+local infixr ` ⊓' `:70 := bd_and
+local infixr ` ⊔' `:70 := bd_or
+
+local infix ` ⟹'' `:62 := bd_imp
+
+local infix ` ⇔' `:50 := lattice.biimp
+
+-- local infix ` ⇔ `:61 := bd_biimp
+
+universe u
+
+section ZFC
+inductive ZFC_rel : ℕ → Type 1
+| ε : ZFC_rel 2
+
+inductive ZFC_func : ℕ → Type 1
+| emptyset : ZFC_func 0
+| pr : ZFC_func 2
+| ω : ZFC_func 0
+| P : ZFC_func 1
+| Union : ZFC_func 1
 
-def relation : bounded_formula L_ZFC 1 := ∀' ((&0 ∈' &1) ⟹ is_ordered_pair ↑' 1 # 1)
---&0 is a relation (is a set of ordered pairs)
+def L_ZFC : Language.{1} :=
+{ functions := ZFC_func,
+  relations := ZFC_rel }
 
--- def relation' : bounded_formula L_ZFC 1 := ∀' (((&0 ∈' &1) : bounded_formula L_ZFC 2) ⟹ (is_ordered_pair ⊚ [0]))
+end ZFC
 
--- lemma chk: relation = relation' := sorry
--- --ideally this should be by refl. Comment out the set_option above the defn of subst_var_bounded_formula to see the snag
+section ZFC
+variables {β : Type 0} [nontrivial_complete_boolean_algebra β]
 
-def function : bounded_formula L_ZFC 1 := relation ⊓ ∀'∀'∀'∀'∀'(&1 ∈' &5 ⊓ ordered_pair ↑' 1 # 3 ↑' 1 # 1 ↑' 1 # 0 ⊓ ((&0 ∈' &5 : bounded_formula L_ZFC 6) ⊓ (ordered_pair ↑' 1 # 2 ↑' 1 # 1).cast(lift_cast)) ⟹ (&3 ≃ &2 : bounded_formula L_ZFC 6))
--- X is a function iff X is a relation and the following holds:
--- ∀x ∀y ∀z ∀w ∀t, ((w ∈ X) ∧ (w = ⟨x, y⟩) ∧ (z ∈ X) ∧ (z = ⟨x, z⟩ ))) →  y = z
+def bSet_model_fun_map : Π {n : ℕ}, L_ZFC.functions n → dvector (bSet β) n → bSet β :=
+begin
+  intros n S, induction S,
+  from λ _, bSet.empty,
+  from λ x, by {cases x, refine bSet.pair x_x _, cases x_xs, from x_xs_x},
+  from λ _, bSet.omega,
+  from λ x, by {cases x, exact bv_powerset x_x},
+  from λ x, by {cases x, from bv_union ‹_›}
+end
+
+def bSet_model_rel_map : Π {n : ℕ}, L_ZFC.relations n → dvector (bSet β) n → β :=
+begin
+  intros n R, induction R,
+  intro x, cases x, cases x_xs,
+  from x_x ∈ᴮ x_xs_x
+end
+
+variable (β)
+def V : bStructure L_ZFC (β) :=
+{ carrier := (bSet β),
+  fun_map := by apply bSet_model_fun_map,
+  rel_map := by apply bSet_model_rel_map,
+  eq := bv_eq,
+  eq_refl := bv_eq_refl,
+  eq_symm := by apply bv_eq_symm,
+  eq_trans := by apply bv_eq_trans,
+  fun_congr :=
+  begin
+    intros n F, cases F,
+      {intros x y, cases x, cases y, simp},
+      tactic.rotate 1,
+      {intros x y, cases x, cases y, simp},
+      {intros x y, cases x, cases y, cases x_xs, cases y_xs,
+        change (_ ⊓ _ : β) ≤ (bv_powerset _) =ᴮ (bv_powerset _), simp,
+        tidy_context, apply bv_powerset_congr ‹_› },
+      {intros x y, cases x, cases y, cases x_xs, cases y_xs,
+        change (_ ⊓ _ : β) ≤ (bv_union _) =ᴮ (bv_union _), simp,
+        tidy_context, from bv_union_congr ‹_›},
+      {intros x y, cases x, cases y, cases x_xs, cases y_xs,
+        change (_ ⊓ (_ ⊓ _) : β) ≤ pair x_x x_xs_x =ᴮ pair y_x y_xs_x,
+        cases x_xs_xs, cases y_xs_xs, simp }
+  end,
+  rel_congr :=
+  begin
+    intros n R, cases R, intros x y,
+    cases x, cases y, cases x_xs, cases y_xs,
+    cases x_xs_xs, cases y_xs_xs,
+    change ((_ ⊓ _) ⊓ (_ ∈ᴮ _) : β) ≤ (_ ∈ᴮ _), simp,
+    tidy_context, apply mem_congr; from ‹_›
+  end}
+
+@[simp] lemma carrier_V : ↥(V β) = bSet β := rfl
+
+@[simp]lemma V_forall {C : (V β) → β} : (⨅(x : V β), C x) = (⨅(x : bSet β), C x) := rfl
+
+@[simp]lemma V_exists {C : (V β) → β} : (⨆(x : V β), C x) = (⨆(x : bSet β), C x) := rfl
+
+@[simp]lemma V_eq {a b} : (V β).eq a b = a =ᴮ b := rfl
+
+@[instance]lemma V_β_nonempty : nonempty (V β) := ⟨bSet.empty⟩
+
+lemma alpha_equiv₁ {C : (bSet β) → β} : (⨅(x : bSet β), C x) = ⨅(y : bSet β), C y := rfl
+lemma alpha_equiv₂ {C : (bSet β) → β} : (⨆(x : bSet β), C x) = ⨆(y : bSet β), C y := rfl
+
+def emptyset {n} : bounded_term L_ZFC n := bd_const ZFC_func.emptyset
 
--- def function' : bounded_formula L_ZFC 1 := relation ⊓ ∀'∀'∀'∀'∀'(((&1 ∈' &5 : bounded_formula L_ZFC 6) ⊓ (ordered_pair ⊚ [1,3,4]) ⊓ ((&0 ∈' &5 : bounded_formula L_ZFC 6) ⊓ (ordered_pair ⊚ [0,2,4]))) ⟹ (&3 ≃ &2 : bounded_formula L_ZFC 6))
+notation `∅'` := emptyset
 
+def omega {n} : bounded_term L_ZFC n := bd_const ZFC_func.ω
 
-def fn_app : bounded_formula L_ZFC 3 := ∃'(&0 ∈' &3 ⊓ ∀'(&0 ∈' &1 ⇔ ((&0 ≃ &3): bounded_formula L_ZFC 5) ⊔ (pair ↑' 1 # 1).cast(lift_cast)))
--- ⟨&1, &0⟩ ∈ &2 
--- &0 = &2(&1) 
+notation `ω'` := omega
 
-def fn_domain : bounded_formula L_ZFC 2 := ∀'(&0 ∈' &2 ⇔ ∃'∃'(ordered_pair ↑' 1 # 1 ↑' 1 # 1 ⊓ &0 ∈' &3))
--- &1 is the domain of &0
+def Powerset {n} : bounded_term L_ZFC n → bounded_term L_ZFC n := bd_app (bd_func ZFC_func.P)
 
-def fn_range : bounded_formula L_ZFC 2 := ∀'(&0 ∈' &2 ⇔ ∃'∃'(∀'(&0 ∈' &1 ⇔ (&0 ≃ &2 : bounded_formula L_ZFC 6) ⊔ (pair ↑' 1 # 1).cast(lift_cast)) ⊓ &0 ∈' &3))
---&1 is the range of &0
+notation `P'` := Powerset
 
-def inverse_relation : bounded_formula L_ZFC 2 := ∀'(&0 ∈' &1 ⇔ ∃'∃'(∃'(∀'(&0 ∈' &1 ⇔ (&0 ≃ &2 : bounded_formula L_ZFC 7) ⊔ (pair ↑' 1 # 1).cast(lift_cast)) ⊓ &0 ∈' &5 : bounded_formula L_ZFC 6)) ⊓ (ordered_pair'.cast(lift_cast)))
--- &0 is the inverse relation of &1
+def mem {n} (t₁ t₂ : bounded_term L_ZFC n) : bounded_formula L_ZFC n :=
+@bounded_formula_of_relation L_ZFC 2 n ZFC_rel.ε t₁ t₂
 
-def function_one_one : bounded_formula L_ZFC 1 := function ⊓ ∀' (inverse_relation ⟹ function.cast(lift_cast))
+local infix ` ∈'`:100 := _root_.mem
 
-def irreflexive_relation : bounded_formula L_ZFC 2 :=  (∀'(&0 ∈' &2 ⟹ (∀'(∀'(&0 ∈' &1) ⇔ ((&0 ≃ &2 : bounded_formula L_ZFC 4) ⊔ ∀'(&0 ∈' &1 ⇔ (&0 ≃ &3 : bounded_formula L_ZFC 5))) ⟹ ∼(&0 ∈' &3))))) ⊓ relation.cast(lift_cast)
--- &0 is an irreflexive relation on &1
-
-def transitive_relation : bounded_formula L_ZFC 2 := ((∀'∀'∀'((((&2 ∈' &4 : bounded_formula L_ZFC 5) ⊓ (&1 ∈' &4)) ⊓ (&0 ∈' &4)) ⊓ ∃'((ordered_pair ↑' 1 # 1).cast(lift_cast) ⊓ (&0 ∈' &4 : bounded_formula L_ZFC 6)) ⊓ ∃'(ordered_pair.cast(lift_cast) ⊓ &0 ∈' &4 : bounded_formula L_ZFC 6) ⟹ ∃'((ordered_pair ↑' 1 # 2).cast(lift_cast) ⊓ &0 ∈' &4 : bounded_formula L_ZFC 6)))) ⊓ relation.cast(lift_cast) 
---&0 is a transitive relation on &1
--- X Tr Y iff X is a relation and the following holds:
--- ∀u ∀v ∀w, (u ∈ Y ∧ v ∈ Y ∧ w ∈ Y ∧ ⟨u, v⟩ ∈ X ∧ ⟨v,w⟩ ∈ X) → ⟨u,w⟩ ∈ X 
-
-def partial_order_zfc : bounded_formula L_ZFC 2 := irreflexive_relation ⊓ transitive_relation
-
-def connected_relation : bounded_formula L_ZFC 2 := relation ↑' 1 # 1 ⊓ ∀'∀'((bd_and (bd_and (&0 ∈' &3) (&1 ∈' &3)) ∼(bd_equal &0 &1)) ⟹ ∃'((&0 ∈' &3 : bounded_formula L_ZFC 5) ⊓ ((ordered_pair ↑' 1 # 3 ↑' 1 # 3) ⊔ ∀'(&0 ∈' &1 ⇔ (&0 ≃ &2 : bounded_formula L_ZFC 6) ⊔ (pair ↑' 1 # 1).cast(lift_cast)))))
---&0 is a connected relation on &1
--- X Con Y iff Rel(X) and ∀u ∀v (u ∈ Y ∧ v ∈ Y ∧ u ≠ v) → ⟨u,v⟩ ∈ X ∨ ⟨v, u⟩ ∈ X
-
-def total_order : bounded_formula L_ZFC 2 := irreflexive_relation ⊓ transitive_relation ⊓ connected_relation
-
-
-
-def well_order : bounded_formula L_ZFC 2 := irreflexive_relation ⊓ ∀'(subset ↑' 1 # 1 ⊓ ∃'(&0 ∈' &1) ⟹ ∃'(&0 ∈' &1 ⊓ ∀'(((&0 ∈' &2) ⊓  ∼(&0 ≃ &1 : bounded_formula L_ZFC 5)) ⟹ ∃'(ordered_pair.cast(lift_cast) ⊓ (&0 ∈' &4 : bounded_formula L_ZFC 6)) ⊓ ∼∃'(∀'(&0 ∈' &1 ⇔ (( &0 ≃ &2 : bounded_formula L_ZFC 7) ⊔ (pair ↑' 1 # 1).cast(lift_cast) )) ⊓ &0 ∈' &4))))
--- &0 well-orders &1
-
-def membership_relation : bounded_formula L_ZFC 1 := relation ⊓ ∀'(&0 ∈' &1 ⇔ ∃'∃'∀'(&0 ∈' &3 ⇔ ((bd_equal &0  &2) ⊔ pair ↑' 1 # 3 ↑' 1 # 3) ⊓ &2 ∈' &1))
--- &0 is E, the membership relation {⟨x,y⟩ | x ∈ y}
-
-def transitive_zfc : bounded_formula L_ZFC 1 := ∀' ((&0 ∈' &1) ⟹ subset)
---&0 is transitive
-
-def fn_zfc_equiv : bounded_formula L_ZFC 3 := ((function_one_one.cast(lift_cast)) ⊓ (fn_domain ↑' 1 # 1)) ⊓ (fn_range ↑' 1 # 2)
-
-def zfc_equiv : bounded_formula L_ZFC 2 := ∃' fn_zfc_equiv
---&0 ≃ &1, i.e. they are equinumerous
-
-def is_powerset : bounded_formula L_ZFC 2 := ∀' ((&0 ∈' &2) ⇔ subset ↑' 1 # 2)
---&1 is P(&0)
-
-def is_suc_of : bounded_formula L_ZFC 2 := ∀' ((&0 ∈' &2) ⇔ ((&0 ∈' &1) ⊔ ( &0 ≃ &1 : bounded_formula L_ZFC 3)))
--- &1 = succ(&0)
-
-def is_ordinal : bounded_formula L_ZFC 1 := (∀' ((membership_relation.cast(lift_cast)) ⟹ well_order)) ⊓ transitive_zfc
-
-def is_suc_ordinal : bounded_formula L_ZFC 1 := is_ordinal ⊓ ∃' is_suc_of
---&0 is a successor ordinal
-
-def ordinal_lt : bounded_formula L_ZFC 2 := (is_ordinal.cast(lift_cast)) ⊓ (is_ordinal ↑' 1 # 0) ⊓ (&0 ∈' &1)
--- &0 < &1
-
-def ordinal_le : bounded_formula L_ZFC 2 := ordinal_lt ⊔ (bd_equal &0 &1)
--- &0 ≤ &1
-
-def is_first_infinite_ordinal : bounded_formula L_ZFC 1 := ∀' ((&0 ∈' &1) ⇔ (((is_emptyset ⊔ is_suc_ordinal)↑' 1 # 1) ⊓ ∀'((&0 ∈' &1) ⟹ ((is_emptyset ⊔ is_suc_ordinal).cast(lift_cast)))))
---&0 = ω
-
-def is_uncountable_ordinal : bounded_formula L_ZFC 1 := ∀' ((is_first_infinite_ordinal.cast(lift_cast)) ⟹ ∀' (subset.cast(lift_cast) ⟹(∼(zfc_equiv ↑' 1 # 1))))
---&0 ≥ ω₁
-
-def is_first_uncountable_ordinal : bounded_formula L_ZFC 1 := is_uncountable_ordinal ⊓ (∀' ((is_uncountable_ordinal ↑' 1 # 1) ⟹ ordinal_le))
---&0 = ω₁
-
-/- Statement of CH -/
-def continuum_hypothesis : sentence L_ZFC := ∀' ∀'  ((∃'((is_first_infinite_ordinal ↑' 1 # 1 ↑' 1 # 1) ⊓ (is_powerset ↑' 1 # 2)) ⊓ (is_first_uncountable_ordinal ↑' 1 #0)) ⟹ zfc_equiv)
-
-def axiom_of_extensionality : sentence L_ZFC := ∀' ∀' (∀' (&0 ∈' &1 ⇔ &0 ∈' &2) ⟹ &0 ≃ &1)
-def axiom_of_union : sentence L_ZFC := ∀' (small ∃' (&1 ∈' &0 ⊓ &0 ∈' &2))
--- todo: c can have free variables. Note that c y x is interpreted as y is the image of x
-def axiom_of_replacement (c : bounded_formula L_ZFC 2) : sentence L_ZFC := 
--- ∀α small (λy, ∃x, x ∈ α ∧ c y x)
-functional c ⟹ ∀' (small ∃' (&0 ∈' &2 ⊓ c.cast1))
-def axiom_of_powerset : sentence L_ZFC := 
--- the class of all subsets of x is small
-∀' small subset
-def axiom_of_infinity : sentence L_ZFC := 
---∀x∃y(x ∈ y ∧ ∀z(z ∈ y → ∃w(z ∈ w ∧ w ∈ y)))
-∀' ∃' (&1 ∈' &0 ⊓ ∀'(&0 ∈' &1 ⟹ ∃' (bd_and (&1 ∈' &0) (&0 ∈' &2))))
-
-def axiom_of_choice : sentence L_ZFC := ∀'∀'(fn_domain ⟹ ∃'∀'(&0 ∈' &2 ⟹∀'(fn_app ↑' 1 # 2 ↑' 1 # 2 ⟹ (∀'(fn_app ↑' 1 # 1 ↑' 1 # 4 ↑' 1 # 4 ⊓ ∃'(&0 ∈' &2)) ⟹ &0 ∈' &1))))
-
-def axiom_of_emptyset : sentence L_ZFC := small ⊥
--- todo: c can have free variables
-def axiom_of_separation (c : Class) : sentence L_ZFC := ∀' (small $ &0 ∈' &1 ⊓ c.cast1)
--- the class consisting of the unordered pair {x, y}
-def axiom_of_pairing : sentence L_ZFC := ∀' ∀' small pair
---the class consisting of the ordered pair ⟨x, y⟩
-def axiom_of_ordered_pairing : sentence L_ZFC := ∀' ∀' small ordered_pair
-
-def ZF : Theory L_ZFC := {axiom_of_extensionality, axiom_of_union, axiom_of_powerset, axiom_of_infinity} ∪ (λ(c : bounded_formula L_ZFC 2), axiom_of_replacement c) '' set.univ
-
-def ZFC : Theory L_ZFC := ZF ∪ {axiom_of_choice}
-
-
-/- ZFC formulae in terms of Mario's Set type. 
-Many of these are a lot shorter than the formulae above, largely because things like {x} and {{x},{x,y}} don't have to be existentially instantiated. It might be advantageous to refactor these to moatch the FOL formulae more precisely.
-(e.g. ({x} ∈ y) vs (∃ w, w = {x} ∧ w ∈ y) -/
-
-def Set_subset : Set → Set → Prop := Set.subset
-
-def Set_is_powerset : Set → Set → Prop := λ x y, ∀ w, w ∈ x ↔ w ⊆ y
-
-def Set_is_emptyset: Set → Prop := λ x, x = ∅ 
-
-def Set_pair : Set → Set → Set → Prop := λ x y z, x = {y,z}
-
-def Set_ordered_pair : Set → Set → Set → Prop := λ x y z, x = {{y},{y,z}}
---TODO : angle bracket notation ⟪x,y⟫ = {{x},{x,y}}
-
-def Set_is_ordered_pair: Set → Prop := λ x, ∃ y z, Set_ordered_pair x y z
-
-def Set_relation : Set → Prop := λ x, ∀w, w ∈ x ↔ Set_is_ordered_pair w
-
-def Set_function : Set → Prop := λ x, Set_relation x ∧ ∀ a b c, ((({{a},{a,b}} ∈ x) ∧ ({{a},{a,c}} ∈ x)) → (b = c))
-
-def Set_fn_app : Set → Set → Set → Prop := λ x y z, {{x},{x,y}} ∈ z 
-
-def Set_fn_domain : Set → Set → Prop := λ x y, ∀ w, w ∈ x ↔ ∃ a b, w = {{a},{a,b}} ∧ a ∈ y
-
-def Set_fn_range: Set → Set → Prop := λ x y, ∀ w, w ∈ x ↔ ∃ a b, w = {{a},{a,b}} ∧ b ∈ y
-
-def Set_inverse_relation  : Set → Set → Prop := λ x y, ∀ a b, {{a},{a,b}} ∈ x ↔ {{b},{b,a}} ∈ y
-
-def Set_function_one_one : Set → Prop := λ x, Set_function x ∧ ∀ y, ((Set_inverse_relation x y) → Set_function y)
-
-def Set_irreflexive_relation : Set → Set → Prop := λ x y, Set_relation x ∧ ∀ z, z ∈ y → {{z},{z}} ∉ x
-
-def Set_transitive_relation : Set → Set → Prop := λ x y, ∀ u v w, ((u ∈ y ∧ v ∈ y ∧ w ∈ w ∧ {{u},{u,v}} ∈ x ∧ {{v},{v,w}} ∈ x) → {{u},{u,w}} ∈ x)
-
-def Set_partial_order : Set → Set → Prop := λ x y, Set_irreflexive_relation x y ⊓ Set_transitive_relation x y
-
-def Set_connected_relation: Set → Set → Prop := λ x y, Set_relation x ∧ ∀ u v, (u ∈ y ∧ v ∈ y ∧ u ≠ v) → ({{u},{u,v}} ∈ x ∨ {{v},{v,u}} ∈ x) 
-
-def Set_total_order : Set → Set → Prop := λ X Y, (Set_irreflexive_relation X Y) ∧ (Set_transitive_relation X Y) ∧ (Set_connected_relation X Y)
-
-def Set_well_order : Set → Set → Prop := λ x y, Set_irreflexive_relation x y ∧ ∀ z, (z ⊆ y ∧ (z ≠ ∅) → ∃w, (w ∈ z ∧ ∀ v, ((v ∈ z ∧ v ≠ w) → {{w},{w,v}} ∈ x ∧ {{v},{v,w}} ∉ x))) 
-
-def Set_membership_relation : Set → Prop := λ x, Set_relation x ∧ ∀ w ∈ x, ∃ u v, {{u},{u,v}} = w ∧ u ∈ v
-
-def Set_transitive : Set → Prop := λ x, ∀ w, w ∈ x → w ⊆ x
-
-def Set_fn_equiv : Set → Set → Set → Prop := λ x y z, Set_function_one_one x ∧ Set_fn_domain x y ∧ Set_fn_range x z  
-
-def Set_zfc_equiv : Set → Set → Prop := λ x y, ∃ f, Set_fn_equiv f x y
-
-def Set_is_suc_of : Set → Set → Prop := λ x y, ∀ w, (w ∈ x ↔ (w ∈ y ∨ w = y))
-
-def Set_is_ordinal : Set → Prop := λ x, (∀ w, (Set_membership_relation w → Set_well_order w x)) ∧ Set_transitive x
-
-def Set_is_suc_ordinal : Set → Prop := λ x, Set_is_ordinal x ∧ ∃ w, Set_is_suc_of x w
-
-def Set_ordinal_lt : Set → Set → Prop := λ x y, Set_is_ordinal x ∧ Set_is_ordinal y ∧ x ∈ y
-
-def Set_ordinal_le : Set → Set → Prop := λ x y, Set_ordinal_lt x y ∨ x = y
-
-def Set_is_first_infinite_ordinal : Set → Prop := λ x, ∀ w, (w ∈ x ↔ ((w = ∅ ∨ Set_is_suc_ordinal w) ∧ ∀ z, (z ∈ w → ((z = ∅ ∨ Set_is_suc_ordinal z)))))
-
-def Set_is_uncountable_ordinal : Set → Prop := λ x, ∀ w, (Set_is_first_infinite_ordinal w → ∀ z, (Set.subset z w → ¬ Set_zfc_equiv z x))
-
-def Set_is_first_uncountable_ordinal : Set → Prop := λ x, Set_is_uncountable_ordinal x ∧ ∀ w, (Set_is_uncountable_ordinal w → Set_ordinal_le x w)
-
-def Set_continuum_hypothesis : Prop := ∀ x y, ((∃ w, (Set_is_first_infinite_ordinal w ∧ Set_is_powerset x w)) ∧ Set_is_first_uncountable_ordinal y) → Set_zfc_equiv x y 
-
-end zfc
+def pair' {n} (t₁ t₂ : bounded_term L_ZFC n) : bounded_term L_ZFC n :=
+@bounded_term_of_function L_ZFC 2 n ZFC_func.pr t₁ t₂
+
+def union' {n} : bounded_term L_ZFC n → bounded_term L_ZFC n := bd_app (bd_func ZFC_func.Union)
+
+notation `⋃'` := union'
+
+local prefix `&'`:max := bd_var
+
+
+@[simp] lemma boolean_realize_bounded_formula_mem {n} {v : dvector (V β) n}
+  (t₁ t₂ : bounded_term L_ZFC n) :
+  boolean_realize_bounded_formula v (t₁ ∈' t₂) ([]) =
+  boolean_realize_bounded_term v t₁ ([]) ∈ᴮ boolean_realize_bounded_term v t₂ ([]) :=
+by refl
+
+@[simp] lemma boolean_realize_bounded_term_Union {n} {v : dvector (V β) n}
+  (t : bounded_term L_ZFC n) :
+  boolean_realize_bounded_term v (⋃' t) ([]) =
+  bv_union (boolean_realize_bounded_term v t ([])) :=
+by refl
+
+@[simp] lemma boolean_realize_bounded_term_Powerset {n} {v : dvector (V β) n}
+  (t : bounded_term L_ZFC n) :
+  boolean_realize_bounded_term v (P' t) ([]) =
+  bv_powerset (boolean_realize_bounded_term v t ([])) :=
+by refl
+
+@[simp] lemma boolean_realize_bounded_term_omega {n} {v : dvector (V β) n} :
+  boolean_realize_bounded_term v ω' ([]) = bSet.omega :=
+by refl
+
+@[simp] lemma boolean_realize_bounded_term_emptyset {n} {v : dvector (V β) n} :
+  boolean_realize_bounded_term v ∅' ([]) = bSet.empty :=
+by refl
+
+@[simp]lemma boolean_realize_bounded_term_pair {n} {v : dvector (V β) n}
+  (t₁ t₂ : bounded_term L_ZFC n) :  boolean_realize_bounded_term v (pair' t₁ t₂) ([]) =
+  pair (boolean_realize_bounded_term v t₁ ([])) (boolean_realize_bounded_term v t₂ ([])) :=
+by refl
+
+@[simp] lemma fin_0 {n : ℕ} : (0 : fin (n+1)).1 = 0 := by refl
+@[simp] lemma fin_1 {n : ℕ} : (1 : fin (n+2)).1 = 1 := by refl
+@[simp] lemma fin_2 {n : ℕ} : (2 : fin (n+3)).1 = 2 := by refl
+@[simp] lemma fin_3 {n : ℕ} : (3 : fin (n+4)).1 = 3 := by refl
+
+def axiom_of_emptyset : sentence L_ZFC := ∀' (∼(&0 ∈' ∅'))
+
+lemma bSet_models_emptyset : ⊤ ⊩[V β] axiom_of_emptyset :=
+by {change ⊤ ≤ _, simp[axiom_of_emptyset, -top_le_iff], intro x, from empty_spec}
+
+-- axiom of ordered pairs
+-- ∀x y z w, (x, y) = (z, w) ↔ x = z ∧ y = w
+def axiom_of_ordered_pairs : sentence L_ZFC :=
+ ∀' ∀' ∀' ∀'(((pair' &'3 &'2 ≃ pair' &'1 &'0)) ⇔ (&'3 ≃ &'1 ⊓ &'2 ≃ &'0))
+
+lemma bSet_models_ordered_pairs : ⊤ ⊩[V β] axiom_of_ordered_pairs :=
+begin
+  change ⊤ ≤ _, simp[axiom_of_ordered_pairs],
+end
+
+-- axiom of extensionality
+-- ∀ x y, (∀ z, (z ∈ x ↔ z ∈ y)) → x = y
+def axiom_of_extensionality : sentence L_ZFC :=
+∀' ∀' (∀'(&'0  ∈' &'2 ⇔  &'0 ∈' &'1) ⟹ (&1 ≃ &0))
+
+lemma bSet_models_extensionality : ⊤ ⊩[V β] axiom_of_extensionality :=
+by simp [forced_in, axiom_of_extensionality]
+
+-- axiom schema of "strong" collection
+-- For every formula `ϕ(x,y,p)` with (at most) `n+2` free variables (`p` is a vector of length `n`),
+-- ∀ p ∀ A, (∀ x ∈ A, ∃ y, ϕ(x,y,p)) ⟹
+--  (∃ B, (∀ x ∈ A, ∃ y ∈ B, ϕ(x,y,p)) ∧ ∀ y ∈ B, ∃ x ∈ A, ϕ(x,y,p))
+def axiom_of_collection {n} (ϕ : bounded_formula L_ZFC (n+2)) : sentence L_ZFC :=
+bd_alls (n+1) $ (∀' (&'0 ∈' &'1 ⟹ ∃' (ϕ ↑' 1 # 2))) ⟹
+(∃' (∀'(&'0 ∈' &'2 ⟹ ∃' (&'0 ∈' &'2 ⊓ (ϕ ↑' 2 # 2))) ⊓
+     ∀'(&'0 ∈' &'1 ⟹ ∃' (&'0 ∈' &'3 ⊓' ((ϕ ↑' 3 # 2)[&'1/0] : _)))))
+
+lemma lift2_helper {L n l} (f : bounded_preformula L n l) {k} (m : ℕ) :
+  f ↑' (k+2) # m = ((f ↑' (k+1) # m) ↑' 1 # m : _) :=
+by { ext, simp only [lift_bounded_formula_fst], rw [lift_formula_at2_medium], refl, linarith }
+
+lemma B_ext_left_realize_bounded_formula {n : ℕ} (ϕ : bounded_formula L_ZFC (n + 1)) (xs : dvector (V β) n) : ∀ (x y : V β), x =ᴮ y ⊓ (boolean_realize_bounded_formula (x::xs) ϕ dvector.nil) ≤ boolean_realize_bounded_formula (y::xs) ϕ dvector.nil :=
+begin
+  intros x y,
+  suffices : (x =ᴮ y = ⨅ (m : fin (n+1)), (V β).eq ((x::xs).nth _ m.is_lt) ((y::xs).nth _ m.is_lt)),
+    by {rw this, apply boolean_realize_bounded_formula_congr, apply_instance},
+  refine le_antisymm _ _,
+    { apply le_infi, rintro ⟨m,Hm⟩,
+      cases m,
+        { refl },
+        { rw [dvector.nth_cons, dvector.nth_cons],
+          {exact bSet.bv_refl, { exact nat.lt_of_succ_lt_succ Hm }},
+      }},
+    { tidy_context, exact a ⟨0, dec_trivial⟩ }
+end
+
+lemma B_ext_right_realize_bounded_formula {n : ℕ} (ϕ : bounded_formula L_ZFC (n + 2)) (xs : dvector (V β) n) : ∀ (x y z : V β), x =ᴮ y ⊓ (boolean_realize_bounded_formula (z::x::xs) ϕ dvector.nil) ≤ boolean_realize_bounded_formula (z::y::xs) ϕ dvector.nil :=
+begin
+  intros x y z,
+  suffices : (x =ᴮ y = ⨅ (m : fin (n+2)), (V β).eq ((z::x::xs).nth _ m.is_lt) ((z::y::xs).nth _ m.is_lt)),
+    by {rw this, apply boolean_realize_bounded_formula_congr, apply_instance},
+  refine le_antisymm _ _,
+    { apply le_infi, rintro ⟨m,Hm⟩,
+      cases m,
+        { exact bSet.bv_refl },
+        { cases m,
+          { refl },
+          { repeat {rw dvector.nth_cons},
+            { exact bSet.bv_refl, apply nat.lt_of_succ_lt_succ,
+              apply nat.lt_of_succ_lt_succ, from ‹_› }} }},
+    { tidy_context, exact a ⟨1, dec_trivial⟩ }
+end
+
+lemma bSet_models_collection {n} (ϕ : bounded_formula L_ZFC (n+2)) : ⊤ ⊩[V β] axiom_of_collection ϕ :=
+begin
+  change ⊤ ≤ _, simp only [axiom_of_collection, boolean_realize_sentence_bd_alls],
+  bv_intro xs, cases xs with _ u xs,
+  simp only
+    [ boolean_realize_bounded_formula_and,
+      boolean_realize_bounded_term, imp_top_iff_le,
+      boolean_realize_bounded_formula_ex, top_le_iff,
+      boolean_realize_bounded_formula, boolean_realize_formula_insert_lift2,
+      lift2_helper, boolean_realize_subst_formula0, fin_2 ],
+  have := bSet_axiom_of_collection
+            (λ a b : V β, boolean_realize_bounded_formula (b :: a :: xs) ϕ ([])) _ _ u,
+  simp only [lattice.top_le_iff, bSet.mem, lattice.imp_top_iff_le, lattice.le_infi_iff] at this,
+  exact this,
+  { intros, apply B_ext_left_realize_bounded_formula },
+  { intros, apply B_ext_right_realize_bounded_formula },
+end
+
+-- axiom of union
+-- ∀ u x, x ∈ ⋃ u ↔ ∃ y ∈ u, x ∈ y
+def axiom_of_union : sentence L_ZFC :=
+∀' ∀' (&'0 ∈' ⋃' &'1 ⇔ (∃' (&'0 ∈' &'2 ⊓ &'1 ∈' &'0)))
+
+lemma bSet_models_union : ⊤ ⊩[V β] axiom_of_union :=
+begin
+  simp [-top_le_iff, forced_in, axiom_of_union, -lattice.le_inf_iff],
+  intros x z,
+  have := @bv_union_spec' _ _ x ⊤,
+  replace this := this z, dsimp at this,
+  bv_split, bv_split_goal
+end
+
+-- axiom of powerset
+-- ∀ u x, x ∈ P(u) ↔ ∀ y ∈ x, y ∈ u
+
+def axiom_of_powerset : sentence L_ZFC :=
+  ∀' ∀' (&'0 ∈' P' &'1 ⇔ (∀' (&'0 ∈' &'1 ⟹ &'0 ∈' &'2)))
+
+lemma bSet_models_powerset : ⊤ ⊩[V β] axiom_of_powerset :=
+begin
+  simp [forced_in, axiom_of_powerset, -lattice.le_inf_iff, -top_le_iff],
+  intros x z, have := @bv_powerset_spec _ _ x z,
+  rw [subset_unfold'] at this,
+  apply le_inf, bv_imp_intro, exact this.mpr H, bv_imp_intro, exact this.mp H
+end
+
+/-- &1 ⊆ &0 ↔ ∀ z, (z ∈ &1 ⟹ z ∈ &0)-/
+def subset'' {n} (t₁ t₂ : bounded_term L_ZFC n): bounded_formula L_ZFC n :=
+∀' (&'0 ∈' (t₁ ↑ 1) ⟹ &'0 ∈' (t₂ ↑ 1))
+
+local infix ` ⊆'`:100 := subset''
+
+@[simp] lemma boolean_realize_bounded_formula_subset {n} {v : dvector (V β) n}
+  (t₁ t₂ : bounded_term L_ZFC n) :
+  boolean_realize_bounded_formula v (t₁ ⊆' t₂) ([]) =
+  boolean_realize_bounded_term v t₁ ([]) ⊆ᴮ boolean_realize_bounded_term v t₂ ([]) :=
+by { simp [subset'', subset_unfold'] }
+
+/- `z` is transitive if `∀ x, x ∈ z ⟹ x ⊆ z` -/
+def is_transitive_f : bounded_formula L_ZFC 1 := ∀' ((&'0 ∈' &'1) ⟹ &'0 ⊆' &'1)
+
+/- `z` is `∈`-trichotomous if `∀ x y ∈ z, x = y ∨ x ∈ y ∨ y ∈ x` -/
+def epsilon_trichotomy_f : bounded_formula L_ZFC 1 :=
+∀' ((&'0 ∈' &'1) ⟹''(∀' (&'0 ∈' &'2 ⟹'' (&'1 ≃ &'0 ⊔' &'1 ∈' &'0) ⊔' &'0 ∈' &'1)))
+
+/- `z` is `∈`-well-founded if `∀ x, x ⊆ z ⟹ x ≠ ∅ ⟹ ∃y ∈ x. ∀w ∈ x. w ∉ y`.
+  Note: this is true for every set by regularity, so we don't have to assume this. But we do it for
+  completeness, to explicitly state that the order relation is well-founded. -/
+def epsilon_well_founded_f : bounded_formula L_ZFC 1 :=
+∀' (((&'0 ⊆' &'1) ⟹'' ((∼(&'0 ≃ ∅')) ⟹'' ∃' (&'0 ∈' &'1 ⊓' (∀' (&'0 ∈' &'2 ⟹'' ∼(&'0 ∈' &'1)))))))
+
+/- `z` is `∈`-well-order if it is `∈`-well-founded and `∈`-trichotomous. -/
+def ewo_f : bounded_formula L_ZFC 1 := epsilon_trichotomy_f ⊓' epsilon_well_founded_f
+
+/- `z` is an ordinal if forms is an `∈`-well-order and `∈` is transitive on `z`. -/
+def Ord_f : bounded_formula L_ZFC 1 := ewo_f ⊓' is_transitive_f
+
+@[simp]lemma Ord_f_is_Ord {x : V β} : boolean_realize_bounded_formula (by exact [x]) Ord_f dvector.nil = Ord x :=
+by {simp [Ord_f,ewo_f,is_transitive_f,epsilon_well_founded_f, epsilon_trichotomy_f], refl}
+
+-- this is the usual axiom of infinity, plus a characterization of omega as the least limit ordinal
+def axiom_of_infinity : sentence L_ZFC :=
+  (∅' ∈' ω' ⊓' ∀'(&'0 ∈' ω' ⟹ ∃' (&'0 ∈' ω' ⊓' &'1 ∈' &'0)))
+  ⊓' (∃' (Ord_f ⊓' ω' ≃ &'0))
+  ⊓' ∀' (Ord_f ⟹ ((∅' ∈' &'0 ⊓' ∀'(&'0 ∈' &'1 ⟹ ∃' (&'0 ∈' &'2 ⊓' &'1 ∈' &'0))) ⟹ ω' ⊆' &0))
+
+lemma bSet_models_infinity : ⊤ ⊩[V β] axiom_of_infinity :=
+begin
+  simp [forced_in, axiom_of_infinity, boolean_realize_sentence,
+    -lattice.le_inf_iff, -top_le_iff],
+  refine le_inf _ _,
+    { exact bSet_axiom_of_infinity' },
+    { refine le_inf _ _,
+      { apply bv_use bSet.omega, exact le_inf Ord_omega bv_refl },
+      { exact omega_least_is_limit } }
+end
+
+-- axiom of regularity
+-- ∀ x, x ≠ ∅ ⟹ ∃ y ∈ x, ∀ z ∈ x, z ∉ y
+
+def axiom_of_regularity : sentence L_ZFC :=
+  ∀' (∼(&0 ≃ ∅') ⟹ (∃' (&'0 ∈' &'1 ⊓ ∀' (&'0 ∈' &'2 ⟹ ∼(&'0 ∈' &'1)))))
+
+lemma bSet_models_regularity : ⊤ ⊩[V β] axiom_of_regularity :=
+begin
+  change ⊤ ≤ _, unfold axiom_of_regularity,
+  simp[-top_le_iff], intro x,
+  bv_imp_intro,
+  apply bSet_axiom_of_regularity, convert H
+end
+
+/- ∀ x, x ≠ ∅ ∧ ((∀ y, y ⊆ x ∧ ∀ w₁ w₂ ∈ y, w₁ ⊆ w₂ ∨ w₂ ⊆ w₁) → (⋃y) ∈ x)
+      → ∃ c ∈ x, ∀ z ∈ x, c ⊆ z → c = z -/
+def zorns_lemma : sentence L_ZFC :=
+∀' (∼ (&'0 ≃ ∅')
+  ⟹ (∀' (&'0 ⊆' &'1 ⊓' (∀' ∀' ((&'1 ∈' &'2 ⊓' &'0 ∈' &'2) ⟹ (&'1 ⊆' &'0 ⊔' &'0 ⊆' &'1)))
+    ⟹ (⋃' &' 0 ∈' &'1)))
+    ⟹  (∃' (&'0 ∈' &'1 ⊓ ∀' (&'0 ∈' &'2 ⟹ &'1 ⊆' &'0 ⟹ &'1 ≃ &'0 ))))
+
+lemma bSet_models_Zorn : ⊤ ⊩[V β] zorns_lemma :=
+begin
+  simp [forced_in, zorns_lemma, boolean_realize_sentence, -lattice.le_inf_iff, -top_le_iff, -lattice.le_infi_iff],
+  from bSet_zorns_lemma'
+end
+
+def ZFC : Theory L_ZFC :=
+  {axiom_of_emptyset, axiom_of_ordered_pairs, axiom_of_extensionality, axiom_of_union,
+   axiom_of_powerset, axiom_of_infinity, axiom_of_regularity, zorns_lemma} ∪
+  set.Union (λ(n : ℕ), axiom_of_collection '' (set.univ : set $ bounded_formula L_ZFC (n+2)))
+
+theorem bSet_models_ZFC : ⊤ ⊩[V β] ZFC :=
+begin
+  change ⊤ ≤ _, bv_intro f, bv_intro H,
+  repeat{auto_cases}; try{subst H}; try {cases H},
+  from bSet_models_Zorn _,
+  from bSet_models_regularity _,
+  from bSet_models_infinity _,
+  from bSet_models_powerset _,
+  from bSet_models_union _,
+  from bSet_models_extensionality _,
+  from bSet_models_ordered_pairs _,
+  from bSet_models_emptyset _,
+  from bSet_models_collection _ ‹_›
+end
+
+include β
+theorem ZFC_consistent : is_consistent ZFC := consis_of_exists_bmodel (bSet_models_ZFC β)
+omit β
+
+/-- f is =ᴮ-extensional if for every w₁ w₂ v₁ v₂, if pair (w₁, v₁) and pair (w₂, v₂) ∈ f and
+    w₁ =ᴮ w₂, then v₁ =ᴮ v₂ -/
+def is_func_f : bounded_formula L_ZFC 1 :=
+∀' ∀' ∀' ∀' ((pair' &'3 &'1 ∈' &'4 ⊓' pair' &'2 &'0 ∈' &'4
+  ⟹ (&'3 ≃ &'2 ⟹ &'1 ≃ &'0)))
+
+@[simp]lemma realize_is_func_f {f : V β} : boolean_realize_bounded_formula (by exact [f]) is_func_f dvector.nil = is_func f :=
+begin
+  simp[is_func_f, bSet.is_func], refl
+end
+
+def is_total'_f : bounded_formula L_ZFC 3 :=
+(∀' (&'0 ∈' &'3 ⟹ (∃' (&'0 ∈' &'3 ⊓' (pair' &'1 &'0 ∈' &'2)))))
+
+@[simp]lemma realize_is_total'_f {x y f : V β} : boolean_realize_bounded_formula (by exact [f, y, x]) is_total'_f dvector.nil = is_total x y f :=
+begin
+  simp [bSet.is_total, is_total'_f]
+end
+
+-- is_total'_f₂ S y f is the same as is_total'_f y S f
+def is_total'_f₂ : bounded_formula L_ZFC 3 :=
+(∀' (&'0 ∈' &'2 ⟹ (∃' (&'0 ∈' &'4 ⊓' (pair' &'1 &'0 ∈' &'2)))))
+
+@[simp]lemma realize_is_total'_f₂ {x y f : V β} : boolean_realize_bounded_formula (by exact [f, y, x]) is_total'_f₂ dvector.nil = is_total y x f :=
+begin
+  rw [bSet.is_total, is_total'_f₂], simp, refl
+end
+
+def is_func'_f : bounded_formula L_ZFC 3 :=
+  (is_func_f.cast (dec_trivial)) ⊓' is_total'_f
+
+def is_func'_f₂ : bounded_formula L_ZFC 3 :=
+(is_func_f.cast dec_trivial) ⊓' is_total'_f₂
+
+@[simp]lemma realize_is_func'_f {x y f : V β} : boolean_realize_bounded_formula (by exact [f, y, x]) is_func'_f dvector.nil = is_func' x y f :=
+by simp [is_func'_f, is_func']
+
+@[simp]lemma realize_is_func'_f₂ {x y f : V β} : boolean_realize_bounded_formula (by exact [f, y, x]) is_func'_f₂ dvector.nil = is_func' y x f :=
+by simp [is_func'_f₂, is_func']
+
+/-
+  `at_most_f x y` means
+  `∃ S, ∃ f, S ⊆ y ∧ f contains a function from S to x ∧ f surjects S onto x`
+  In `bSet` it corresponds to the formula `larger_than y x`.
+
+  `at_most_f x y` is equivalent to `¬ y ≺ x`.
+-/
+def at_most_f : bounded_formula L_ZFC 2 :=
+∃' (∃' (((&'1 ⊆' &'3) ⊓' (is_func'_f₂).cast (dec_trivial : 3 ≤ 4)) ⊓'
+        ∀' ( &0 ∈' &3 ⟹ (∃' (&'0 ∈' &'3 ⊓' pair' &'0 &'1 ∈' &'2)))))
+
+@[simp]lemma realize_at_most_f {x y : V β} :
+  boolean_realize_bounded_formula ([y,x]) at_most_f dvector.nil = larger_than x y :=
+by simp[larger_than, at_most_f, is_func]
+
+
+def is_inj_f : bounded_formula L_ZFC 1 :=
+∀' ∀' ∀' ∀' (((pair' &'3 &'1 ∈' &'4 ⊓' pair' &'2 &'0 ∈' &'4) ⊓ &'1 ≃ &'0) ⟹ &'3 ≃ &'2)
+
+@[simp]lemma realize_is_inj_f (f : V β) :
+  boolean_realize_bounded_formula (by exact [f]) is_inj_f dvector.nil = is_inj f :=
+by {simp[is_inj_f, is_inj], refl}
+
+def injects_into_f : bounded_formula L_ZFC 2 :=
+ ∃' (is_func'_f ⊓' is_inj_f.cast (dec_trivial))
+
+@[simp]lemma realize_injects_into {x y : V β} :
+  boolean_realize_bounded_formula (by exact [y,x]) injects_into_f dvector.nil = injects_into x y :=
+by {simp[injects_into_f, injects_into]}
+
+def non_empty_f : bounded_formula L_ZFC 1 := ∼(&'0 ≃ ∅')
+
+@[simp]lemma non_empty_f_is_non_empty {x : V β} : boolean_realize_bounded_formula (by exact [x]) non_empty_f dvector.nil = not_empty x := by {simp[non_empty_f], refl}
+
+/-- The continuum hypothesis is given by the formula
+  `∀x, x is an ordinal ⟹ x ≤ ω ∨ P(ω) ≤ x`.
+  Here `a ≤ b` means there is a surjection from a subset of `b` to `a`.
+  We have to perform two substitutions (`substmax_bounded_formula` and `[../0]`)
+  to apply `at_most_f` to the appropriate arguments. -/
+def CH_f : sentence L_ZFC :=
+∀' (Ord_f ⟹ (substmax_bounded_formula at_most_f ω' ⊔' at_most_f[Powerset omega/0]))
+
+variable {β}
+lemma CH_f_is_CH : ⟦CH_f⟧[V β] = CH₂ :=
+begin
+  have h1 : ∀(x : V β), boolean_realize_bounded_formula ([x])
+    (substmax_bounded_formula at_most_f omega) ([]) =
+    boolean_realize_bounded_formula ([x,omega]) at_most_f ([]),
+  { intro, refl },
+  have h2 : ∀(x : V β), boolean_realize_bounded_formula ([x]) (at_most_f[P' omega /0]) ([]) =
+    boolean_realize_bounded_formula (([bv_powerset omega, x] : dvector (V β) 2)) at_most_f ([]),
+  { intro, refl },
+  -- note: once we have proven realize_substmax_bf and realize_subst0_bf, we can add them to this simp set
+  simp [-substmax_bounded_formula, CH_f, CH₂, neg_supr, sup_assoc, h1, h2, lattice.imp]
+end
+
+lemma CH_f_sound {Γ : β} : Γ ⊩[V β] CH_f ↔ Γ ≤ CH₂ :=
+by {change _ ≤ _ ↔ _ ≤ _, rw CH_f_is_CH}
+
+lemma neg_CH_f_sound {Γ : β} : Γ ⊩[V β] ∼CH_f ↔ Γ ≤ - CH₂ :=
+by {change _ ≤ _ ↔ _ ≤ _, rw [boolean_realize_sentence_not, CH_f_is_CH]}
+
+end ZFC
+
+open pSet cardinal
+
+section CH_unprovable
+
+
+lemma V_𝔹_cohen_models_neg_CH : ⊤ ⊩[V 𝔹_cohen] ∼CH_f :=
+begin
+  rw neg_CH_f_sound, exact neg_CH₂
+end
+
+instance V_𝔹_nonempty : nonempty (V 𝔹_cohen) := ⟨bSet.empty⟩
+
+theorem CH_f_unprovable : ¬ (ZFC ⊢' CH_f) :=
+unprovable_of_model_neg _ (bSet_models_ZFC _) (nontrivial.bot_lt_top) V_𝔹_cohen_models_neg_CH
+
+end CH_unprovable
+
+open collapse_algebra
+
+section neg_CH_unprovable
+
+instance V_𝔹_collapse_nonempty : nonempty (V 𝔹_collapse) := ⟨bSet.empty⟩
+
+lemma V_𝔹_collapse_models_CH : ⊤ ⊩[V 𝔹_collapse] CH_f :=
+by { rw CH_f_sound, exact CH₂_true }
+
+theorem neg_CH_f_unprovable : ¬ (ZFC ⊢' ∼CH_f) :=
+unprovable_of_model_neg (V 𝔹_collapse) (bSet_models_ZFC _)
+  (nontrivial.bot_lt_top) (by {rw forced_in_not, from V_𝔹_collapse_models_CH})
+
+end neg_CH_unprovable
+
+section
+-- a nicer formulation of CH using formulae
+
+@[simp] def Powerset_t : term L_ZFC → term L_ZFC := app (func ZFC_func.P)
+@[simp] def omega_t : term L_ZFC := func ZFC_func.ω
+@[simp] def leq_f : formula L_ZFC := at_most_f.fst
+@[simp] def is_ordinal : formula L_ZFC := Ord_f.fst
+
+def CH_formula : formula L_ZFC :=
+∀' (is_ordinal ⟹ leq_f[omega_t//1] ⊔ leq_f[Powerset_t omega_t//0])
+
+lemma CH_f_fst : CH_f.fst = CH_formula :=
+by { simp [CH_f, CH_formula, -substmax_bounded_formula], refl }
+
+end

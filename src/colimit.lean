@@ -1,4 +1,10 @@
-import .to_mathlib tactic.tidy tactic.linarith
+/-
+Copyright (c) 2019 The Flypitch Project. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+
+Authors: Jesse Han, Floris van Doorn
+-/
+import .to_mathlib
 
 /- The proper generality to do this is with directed categories as the indexing objects -/
 
@@ -93,15 +99,13 @@ attribute [instance] coproduct_setoid
 def colimit {D : (directed_type : Type (u+1)) } (F : (directed_diagram D :  Type (max (u+1) (v+1)))) : Type (max u v) :=
   @quotient (coproduct_of_directed_diagram F) (by fapply coproduct_setoid)
 
-
-
 def canonical_map {D : directed_type} {F : directed_diagram D} (i : D.carrier) :
                   F.obj i → colimit F := (by apply quotient.mk) ∘ canonical_inclusion_coproduct i
 
 lemma canonical_map_inj_of_transition_maps_inj {D : directed_type} {F : directed_diagram D} (i : D.carrier) (H : ∀ {i} {j}, ∀ h : D.rel i j, function.injective (F.mor h)) : function.injective (@canonical_map D F i) :=
 begin
     unfold function.injective canonical_map canonical_inclusion_coproduct, intros x y,
-    simp only [function.comp_app, quotient.eq], simp only [(≈)], 
+    simp only [function.comp_app, quotient.eq], simp only [(≈)],
     unfold germ_relation, intro H_eqv, rcases H_eqv with ⟨j,z,edge,_, ⟨H1, H2⟩⟩,
     exact H edge (by cc)
 end
@@ -194,11 +198,6 @@ lemma same_fiber_as_push_to_l {F : directed_diagram ℕ'} {j} (x : F.obj j) (i) 
      canonical_map j x = canonical_map (i+j) (push_to_sum_l x i)  :=
 by {have := (cocone_of_colimit F).h_compat, have := @this i (i+j) (by simp), tidy}
 
-namespace nat
-@[simp]lemma le_of_le_and_ne_succ {x y : ℕ} (H : x ≤ y + 1) (H' : x ≠ y + 1) : x ≤ y :=
-by simp only [*, nat.lt_of_le_and_ne, nat.le_of_lt_succ, ne.def, not_false_iff]
-end nat
-
 end colimit
 namespace omega_colimit
 open colimit
@@ -234,18 +233,16 @@ refine ⟨F, by {apply diagram.mk.map, assumption}, _⟩,
     dsimp[diagram.mk.map], refl,
      by {exfalso, fapply nat.succ_ne_zero, exact x_n, apply (nat.le_zero_iff).mp, assumption},
      by {exfalso, fapply nat.succ_ne_zero, exact y_n, apply (nat.le_zero_iff).mp, assumption},
-     by_cases y = z_n+1, subst h;
+     by_cases h : y = z_n+1, subst h;
        by_cases x = z_n+1;
        {repeat{dsimp[diagram.mk.map], simp*, refl}},
-     by_cases x = z_n+1,
-       {exfalso, have : y < z_n+1, by {fapply nat.lt_of_le_and_ne,
-         repeat{assumption}}, dsimp at *, linarith},
+     by_cases h' : x = z_n+1,
+       {exfalso, have : y < z_n+1 := lt_of_le_of_ne H2 h, dsimp at *, linarith},
        {have h_x : x ≤ z_n; have h_y : y ≤ z_n,
          all_goals{try{apply nat.le_of_le_and_ne_succ, repeat{assumption}}},
         have := @z_ih h_y h_x,
-        dsimp[diagram.mk.map], dedup,
-        simp only [h, h_1, dif_neg, not_false_iff, colimit.nat.le_of_le_and_ne_succ],
-        rw[this]}
+        dsimp[diagram.mk.map],
+        simp only [h, h', dif_neg, not_false_iff, nat.le_of_le_and_ne_succ, this]}
 end
 
 -- TODO refactor henkin_language_chain et al in terms of diagram.mk
